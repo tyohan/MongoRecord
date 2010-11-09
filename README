@@ -1,0 +1,85 @@
+This extension is a basic active record for MongoDb. I've used it in my project at This http://rserve.me I have not fully tested it yet but so far it's work like I expected. I share it to you all so you can use it as reference or fix it if it has bugs.
+
+Documentation 
+
+Requirements 
+
+Tested with Yii 1.1.2
+Installation 
+
+Extract the release file under protected/components
+Insert the code below in your config file inside components sections
+'mongodb'=>array(
+                    'class'=>'MongoDbConnection',
+                    'db'=>'rserve'
+                ),
+Usage 
+
+See the following code example, this is an ActiveRecord example for Venue Collection:
+
+/**
+ * Venue model used for interacting with venue collections in mongodb
+ *
+ * @author yohan
+ */
+ 
+class Venue extends MongoRecord
+{
+/**
+ * Default document to store inside a record
+ */
+    protected $_document=array(
+        'merchant_id'=>'','name'=>'','desc'=>''
+    );
+/**
+ * Return collection or table name 
+ */
+    protected function  getCollectionName()
+    {
+        return 'venue';
+    }
+ 
+    public static function model($className=__CLASS__)
+    {
+      return parent::model($className);
+    }
+    public function rules()
+    {
+        return array();
+    }
+ 
+    public function attributeNames()
+    {
+        return array();
+    }
+ 
+ 
+ 
+ 
+}
+This component was extended from CModel component, just like CActiveRecord component. And it's borrow many method from CActiveRecord. So basically you can use it just like you use CActiveRecord.
+
+the $this->_document property is a default document that will store in MongoDb document. It just like table structure in conventional DB. Because it's like CActiveRecord, you can access and modify the your $_document record just like using class property. For example to insert new record;
+
+$venue=new Venue;
+$venue->merchant_id=1;
+$venue->save(FALSE); //disable validation
+You can post your question on http://www.yiiframework.com/forum/index.php?/topic/11887-mongorecord-extensions/.
+
+To find records, you can use this both method that similar with CActiveRecord methods
+
+$query=array('_id=>new MongoId('4c8377a88ead0ec468000000'));
+ModelName::model()->find($query);
+this method will return MongoRecord instance
+
+$query=array('merchant_id'=>1,'');
+ModelName::model()->findAll($query);
+This method will return an array that contains MongoRecord instance
+
+The $query is the same query that used in MongoRecord criteria query in PHP MongoDb query function. You can read how to write the criteria query on
+
+http://www.php.net/manual/en/mongo.queries.php
+
+Note 
+
+I haven't implement ensure index function because I still confuse where is the best way to ensure the index of document. I though if I do it every time we call find() and findAll() method it will decrease it's performance. May be we need to call it manually to set the index in collection.
