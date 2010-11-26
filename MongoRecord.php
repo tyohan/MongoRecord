@@ -110,7 +110,7 @@ abstract  class MongoRecord extends CModel
                     return $attrs;
             }
             else
-                    return $this->$doc;
+                    return $doc;
     }
     abstract protected function getCollectionName();
     
