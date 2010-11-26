@@ -116,8 +116,7 @@ abstract  class MongoRecord extends CModel
     
     public function getCollection()
     {
-        $collection=$this->collectionName;
-        return $this->db->$collection;
+        return $this->db->{$this->collectionName};
     }
    
     public function getIsNewRecord()
