@@ -355,8 +355,8 @@ abstract  class MongoRecord extends CModel
 	{
 		$class=get_class($this);
 		$model=new $class(null);
-                $model->_document=array_merge($this->_document,$document);
-                $this->afterFind();
+        $model->_document=array_merge($this->_document,$document);
+        $model->afterFind();
 		return $model;
 	}
 	/**
