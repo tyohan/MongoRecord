@@ -74,4 +74,3 @@ class MongoDbConnection extends CApplicationComponent
         return $this->_host;
     }
 }
-?>

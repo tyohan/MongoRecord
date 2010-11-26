@@ -139,6 +139,7 @@ abstract  class MongoRecord extends CModel
         if(!empty($this->_document['_id']))
         {
             $this->_id=$this->_document['_id'];
+            $this->afterSave();
             return TRUE;
         }
         else
@@ -150,7 +151,9 @@ abstract  class MongoRecord extends CModel
 
     public function update()
     {
-        return $this->collection->save($this->_document,array('fsync'=>TRUE));
+       $update=$this->collection->save($this->_document,array('fsync'=>TRUE));
+       $this->afterSave();
+       return $update;
     }
     public function delete()
     {
@@ -355,8 +358,8 @@ abstract  class MongoRecord extends CModel
 	{
 		$class=get_class($this);
 		$model=new $class(null);
-        $model->_document=array_merge($this->_document,$document);
-        $model->afterFind();
+                $model->_document=array_merge($this->_document,$document);
+                $model->afterFind();
 		return $model;
 	}
 	/**
@@ -435,7 +438,4 @@ abstract  class MongoRecord extends CModel
 			return $model;
 		}
 	}
-
-
 }
-?>
