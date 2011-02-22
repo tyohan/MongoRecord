@@ -8,6 +8,8 @@
 abstract  class MongoRecord extends CModel
 {
     public static $db;
+    public $safe=TRUE;
+    public $fsync=TRUE;
     private $_sort;
     private $_id;
     private $_new;
@@ -24,16 +26,8 @@ abstract  class MongoRecord extends CModel
         return Yii::app()->getComponent('mongodb')->db;
     }
     
-    private function getSafe()
-    {
-        return TRUE;
-    }
     
-    private function getFsync()
-    {
-        return TRUE;
-    }
-   
+  
     /**
      * Convert collection record from array multi level to flat array.
      * Record will only flatted when the array key is not numeric key
@@ -65,7 +59,7 @@ abstract  class MongoRecord extends CModel
             $this->setScenario($arg);
             $this->setIsNewRecord(true);
 
-            $this->init();
+            //$this->init();
 
             $this->attachBehaviors($this->behaviors());
             $this->afterConstruct();
@@ -130,13 +124,16 @@ abstract  class MongoRecord extends CModel
    
     public function getIsNewRecord()
     {
-           return ($this->_id instanceof  MongoId)?TRUE:FALSE;
+           return (!$this->_id instanceof  MongoId)?TRUE:FALSE;
 
     }
     public function save($runValidation=true,$attributes=null)
     {
+            
             if(!$runValidation || $this->validate($this->attributes))
+            {
                     return $this->getIsNewRecord() ? $this->insert() : $this->update();
+            }
             else
                     return false;
     }
@@ -145,19 +142,28 @@ abstract  class MongoRecord extends CModel
      * Save document in $this->_document to database
      */
     public function insert()
-    {
-        $this->collection->insert($this->_document,array('fsync'=>TRUE));
-        if(!empty($this->_document['_id']))
+    {   
+        
+        try
         {
-            $this->_id=$this->_document['_id'];
-            $this->afterSave();
-            return TRUE;
+            $this->collection->insert($this->_document,array('fsync'=>$this->fsync,'safe'=>$this->safe));
+        
+            if(!empty($this->_document['_id']))
+            {
+                $this->_id=$this->_document['_id'];
+                $this->afterSave();
+                return TRUE;
+            }
+            else
+                return FALSE;
         }
-        else
+        catch (MongoCursorException $e)
         {
-            $this->addError('_id', "Can't save document to disk");
+            throw new CDbException($e->getMessage(), $e->getCode());
             return FALSE;
         }
+        
+        
     }
     
     /**
@@ -168,9 +174,17 @@ abstract  class MongoRecord extends CModel
     {
        $doc=$this->_document;
        unset ($doc['_id']);
-       $update=$this->collection->update(array('_id'=>new MongoId($this->_id)),array('$set'=>$doc),array('fsync'=>$this->fsync,'multiple'=>FALSE));
-       $this->afterSave();
-       return $update;
+       try
+       {
+           $update=$this->collection->update(array('_id'=>new MongoId($this->_id)),array('$set'=>$doc),array('fsync'=>$this->fsync,'multiple'=>FALSE));
+           $this->afterSave();
+           return $update;
+       }
+       catch (MongoCursorException $e)
+       {
+           throw new CDbException($e->getMessage(), $e->getCode());
+       }
+       
     }
     
     /**
