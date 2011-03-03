@@ -129,7 +129,6 @@ abstract  class MongoRecord extends CModel
     }
     public function save($runValidation=true,$attributes=null)
     {
-            
             if(!$runValidation || $this->validate($this->attributes))
             {
                     return $this->getIsNewRecord() ? $this->insert() : $this->update();
@@ -143,25 +142,22 @@ abstract  class MongoRecord extends CModel
      */
     public function insert()
     {   
-        
-        try
+        if($this->beforeSave())
         {
-            $this->collection->insert($this->_document,array('fsync'=>$this->fsync,'safe'=>$this->safe));
-        
-            if(!empty($this->_document['_id']))
+            try
             {
+                $insert=$this->collection->insert($this->_document,array('fsync'=>$this->fsync,'safe'=>$this->safe));
                 $this->_id=$this->_document['_id'];
                 $this->afterSave();
                 return TRUE;
             }
-            else
+            catch (MongoCursorException $e)
+            {
+                throw new CDbException($e->getMessage(), $e->getCode());
                 return FALSE;
+            }
         }
-        catch (MongoCursorException $e)
-        {
-            throw new CDbException($e->getMessage(), $e->getCode());
-            return FALSE;
-        }
+        return FALSE;
         
         
     }
@@ -172,19 +168,25 @@ abstract  class MongoRecord extends CModel
      */
     public function update()
     {
-       $doc=$this->_document;
-       unset ($doc['_id']);
-       try
+       if($this->getIsNewRecord())
+            throw new CDbException(Yii::t('yii','The active record cannot be updated because it is new.'));
+       if($this->beforeSave())
        {
-           $update=$this->collection->update(array('_id'=>new MongoId($this->_id)),array('$set'=>$doc),array('fsync'=>$this->fsync,'multiple'=>FALSE));
-           $this->afterSave();
-           return $update;
+           $doc=$this->_document;
+           unset ($doc['_id']);
+           try
+           {
+               $update=$this->collection->update(array('_id'=>new MongoId($this->_id)),array('$set'=>$doc),array('fsync'=>$this->fsync,'multiple'=>FALSE));
+               $this->afterSave();
+               return TRUE;
+           }
+           catch (MongoCursorException $e)
+           {
+               throw new CDbException($e->getMessage(), $e->getCode());
+               return FALSE;
+           }
        }
-       catch (MongoCursorException $e)
-       {
-           throw new CDbException($e->getMessage(), $e->getCode());
-       }
-       
+       return FALSE;
     }
     
     /**
