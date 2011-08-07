@@ -10,13 +10,18 @@ abstract  class MongoRecord extends CModel
     public static $db;
     public $safe=TRUE;
     public $fsync=TRUE;
-    private $_sort;
-    private $_id;
-    private $_new;
     public $limit=0;
     public $skip=0;
-
-
+    public $useCursor=TRUE;
+    
+    private $_sort;
+    private $_new;
+    
+    /**
+     * Set this property to FALSE if you have defined _id variable as object ID
+     */
+    public $bsonID=TRUE;
+    
     /**
      * $_document property to store MongoDB document. Must defined as array in each MongoRecord model.
      */
@@ -93,7 +98,9 @@ abstract  class MongoRecord extends CModel
      */
     public function __set($name,$value)
     {
-        if(array_key_exists($name,$this->_document))
+        if($name==='id')
+            $this->_document['_id']=$value;
+        elseif(array_key_exists($name,$this->_document))
                 $this->_document[$name]=$value;
         else
                 parent::__set($name,$value);
@@ -127,32 +134,27 @@ abstract  class MongoRecord extends CModel
    
     public function getIsNewRecord()
     {
-            if(!isset($this->_document['_id']))
-                return TRUE;
-            
-           return (!$this->id instanceof  MongoId)?TRUE:FALSE;
-
+        return $this->_new;
     }
+    
     public function save($runValidation=true,$attributes=null)
     {
-            if(!$runValidation || $this->validate($this->attributes))
-            {
-                    return $this->getIsNewRecord() ? $this->insert() : $this->update();
-            }
-            else
-                    return false;
+        if(!$runValidation || $this->validate($attributes))
+           return $this->getIsNewRecord() ? $this->insert($attributes) : $this->update($attributes);
+        else
+           return false;
     }
     
     /**
      * Save document in $this->_document to database
      */
-    public function insert()
+    public function insert($attributes=null)
     {   
         if($this->beforeSave())
         {
             try
             {
-                $insert=$this->collection->insert($this->_document,array('fsync'=>$this->fsync,'safe'=>$this->safe));
+                $insert=$this->collection->insert($this->getAttributes($attributes),array('fsync'=>$this->fsync,'safe'=>$this->safe));
                 $this->_id=$this->_document['_id'];
                 $this->afterSave();
                 return TRUE;
@@ -172,17 +174,17 @@ abstract  class MongoRecord extends CModel
      * Update record in database with data from document
      * @return boolean whether record is succesfully updated or not
      */
-    public function update()
+    public function update($attributes=null)
     {
        if($this->getIsNewRecord())
             throw new CDbException(Yii::t('yii','The active record cannot be updated because it is new.'));
        if($this->beforeSave())
        {
            $doc=$this->_document;
-           unset ($doc['_id']);
+           $id=($this->bsonID)?new MongoId($this->id):$this->id;
            try
            {
-               $update=$this->collection->update(array('_id'=>new MongoId($this->id)),array('$set'=>$doc),array('fsync'=>$this->fsync,'multiple'=>FALSE));
+               $update=$this->collection->update(array('_id'=>$id),array('$set'=>$doc),array('fsync'=>$this->fsync,'multiple'=>FALSE));
                $this->afterSave();
                return TRUE;
            }
@@ -248,7 +250,9 @@ abstract  class MongoRecord extends CModel
      */
     public function deleteById($id)
     {
-        $result= $this->collection->remove(array('_id'=>new MongoId($id)),array('justOne'=>TRUE,'safe'=>$this->safe));
+        if($this->bsonID)
+                $id=new MongoId($id);
+        $result= $this->collection->remove(array('_id'=>$id),array('justOne'=>TRUE,'safe'=>$this->safe));
         if(is_array($result) && isset($result['ok']))
             return $result['ok'];
         else
@@ -354,6 +358,7 @@ abstract  class MongoRecord extends CModel
      */
     public function onAfterFind($event)
     {
+            $this->setIsNewRecord(FALSE);
             $this->raiseEvent('onAfterFind',$event);
     }
 
@@ -495,6 +500,7 @@ abstract  class MongoRecord extends CModel
     {
         return $this->find(array('_id'=>new MongoId($id)));
     }
+    
     public function limit($limit)
     {
         $this->limit=$limit;
