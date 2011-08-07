@@ -13,7 +13,10 @@ abstract  class MongoRecord extends CModel
     private $_sort;
     private $_id;
     private $_new;
-    
+    public $limit=0;
+    public $skip=0;
+
+
     /**
      * $_document property to store MongoDB document. Must defined as array in each MongoRecord model.
      */
@@ -124,7 +127,10 @@ abstract  class MongoRecord extends CModel
    
     public function getIsNewRecord()
     {
-           return (!$this->_id instanceof  MongoId)?TRUE:FALSE;
+            if(!isset($this->_document['_id']))
+                return TRUE;
+            
+           return (!$this->id instanceof  MongoId)?TRUE:FALSE;
 
     }
     public function save($runValidation=true,$attributes=null)
@@ -176,7 +182,7 @@ abstract  class MongoRecord extends CModel
            unset ($doc['_id']);
            try
            {
-               $update=$this->collection->update(array('_id'=>new MongoId($this->_id)),array('$set'=>$doc),array('fsync'=>$this->fsync,'multiple'=>FALSE));
+               $update=$this->collection->update(array('_id'=>new MongoId($this->id)),array('$set'=>$doc),array('fsync'=>$this->fsync,'multiple'=>FALSE));
                $this->afterSave();
                return TRUE;
            }
@@ -209,7 +215,7 @@ abstract  class MongoRecord extends CModel
                 Yii::trace(get_class($this).'.delete()','system.db.ar.CActiveRecord');
                 if($this->beforeDelete())
                 {
-                        $result=$this->deleteById($this->_id);
+                        $result=$this->deleteById($this->id);
                         $this->afterDelete();
                         return $result;
                 }
@@ -473,34 +479,50 @@ abstract  class MongoRecord extends CModel
     }
     public function find($query=array())
     {
-         if(!empty($query))
-            $doc=$this->collection->findOne($query);
-        else
-            $doc=$this->collection->findOne();
+        $doc=$this->collection->findOne($query);
 
         if($doc!==NULL)
             return $this->instantiate($doc);
         else
             return NULL;
     }
-
+    
+    public function count($query=array())
+    {
+        return $this->collection->count($query,  $this->limit,$this->skip);
+    }
     public function findById($id)
     {
         return $this->find(array('_id'=>new MongoId($id)));
     }
-
+    public function limit($limit)
+    {
+        $this->limit=$limit;
+        return $this;
+    }
+    public function skip($skip)
+    {
+        $this->skip=$skip;
+        return $this;
+    }
+    
     public function findAll($criteria=array())
     {
-
         if(isset($criteria['query']))
             $docs=$this->collection->find($criteria['query']);
         else
-            $docs=$this->collection->find();
-
-        if(isset($criteria['limit']))
-            $docs=$docs->limit($criteria['limit']);
+            $docs=$this->collection->find($criteria);
+        
         if(isset($criteria['sort']))
             $docs=$docs->sort($criteria['sort']);
+        else if(!empty($this->_sort))
+            $docs=$docs->sort($this->_sort);
+        
+        if(isset($criteria['limit']) || $this->limit>0)
+            $docs=$docs->limit(isset($criteria['limit'])?$criteria['limit']:$this->limit);
+        if(isset($criteria['skip']) || $this->skip>0)
+            $docs=$docs->skip(isset($criteria['skip'])?$criteria['skip']:$this->skip);
+        
         return $this->populateRecords($docs);
 
     }
@@ -529,6 +551,7 @@ abstract  class MongoRecord extends CModel
 
     public function sort($field=array())
     {
-        $this->_sort=array();
+        $this->_sort=$field;
+        return $this;
     }
 }
